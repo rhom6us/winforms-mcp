@@ -1,5 +1,11 @@
 # fnWindowsMCP - WinForms Automation MCP Server
 
+[![CI Status](https://github.com/rhom6us/winforms-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rhom6us/winforms-mcp/actions/workflows/ci.yml)
+[![Publish Status](https://github.com/rhom6us/winforms-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/rhom6us/winforms-mcp/actions/workflows/publish.yml)
+[![NuGet Version](https://img.shields.io/nuget/v/Rhombus.WinFormsMcp)](https://www.nuget.org/packages/Rhombus.WinFormsMcp)
+[![NPM Version](https://img.shields.io/npm/v/@rhom6us/winforms-mcp)](https://www.npmjs.com/package/@rhom6us/winforms-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **fnWindowsMCP** is a Model Context Protocol (MCP) server that provides headless automation capabilities for WinForms applications. It uses the FlaUI library with the UIA2 backend (MSAA - Microsoft Active Accessibility) to enable full Windows Forms compatibility without requiring visual interaction.
 
 ## Overview
@@ -537,7 +543,7 @@ Contributions welcome! Areas for enhancement:
 
 ## License
 
-[Specify your license here]
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
