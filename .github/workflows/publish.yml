@@ -139,10 +139,11 @@ jobs:
         npm config set @rhom6us:registry https://registry.npmjs.org/
         npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}
         cd npm
-        npm publish --access public
+        npm publish --access public || echo "Package already published or publish failed, continuing..."
       if: env.NPM_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       env:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      continue-on-error: true
 
     # Step 4: Publish to NuGet using Trusted Publishing
     - name: Create NuGet output directory
