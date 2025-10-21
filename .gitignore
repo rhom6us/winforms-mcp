@@ -57,3 +57,21 @@ Thumbs.db
 *.png
 *.jpg
 *.jpeg
+
+# NPM
+node_modules/
+npm/dist/
+npm/node_modules/
+package-lock.json
+npm-debug.log
+
+# Test outputs
+test_results.txt
+coverage_results.txt
+coverage_report_e2e.txt
+all_tests_results.txt
+build_output.txt
+
+# Build artifacts
+nupkg/
+publish/

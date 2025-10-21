@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Rhombus.WinFormsMcp.Server</RootNamespace>
+    <AssemblyName>Rhombus.WinFormsMcp.Server</AssemblyName>
+
+    <!-- NuGet Package Configuration -->
+    <PackageId>Rhombus.WinFormsMcp</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>rhom6us</Authors>
+    <Company>rhom6us</Company>
+    <Product>Rhombus.WinFormsMcp</Product>
+    <Description>WinForms automation MCP server using FlaUI with UIA2 backend for headless Windows Forms application testing and automation</Description>
+    <PackageProjectUrl>https://github.com/rhom6us/winforms-mcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rhom6us/winforms-mcp.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>winforms;automation;flaui;ui-testing;mcp;model-context-protocol;headless</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- FlaUI for WinForms automation (UIA2 for maximum compatibility) -->
+    <PackageReference Include="FlaUI.UIA2" Version="4.0.0" />
+    <PackageReference Include="FlaUI.Core" Version="4.0.0" />
+
+    <!-- System.Drawing for screenshots -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

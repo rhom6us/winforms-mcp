@@ -1,0 +1,42 @@
+{
+  "name": "@rhom6us/winforms-mcp",
+  "version": "1.0.0",
+  "description": "WinForms automation MCP server with headless UI automation capabilities",
+  "main": "index.js",
+  "bin": {
+    "winforms-mcp": "./bin/winforms-mcp.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "keywords": [
+    "winforms",
+    "automation",
+    "flaui",
+    "ui-testing",
+    "mcp",
+    "model-context-protocol",
+    "headless",
+    "windows",
+    "testing"
+  ],
+  "author": "rhom6us",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rhom6us/winforms-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rhom6us/winforms-mcp/issues"
+  },
+  "homepage": "https://github.com/rhom6us/winforms-mcp",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}
