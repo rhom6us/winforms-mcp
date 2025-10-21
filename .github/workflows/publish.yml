@@ -10,6 +10,8 @@ on:
 jobs:
   build-and-publish:
     runs-on: windows-latest
+    permissions:
+      id-token: write  # Enable GitHub OIDC token issuance for NuGet trusted publishing
 
     steps:
     - uses: actions/checkout@v4
@@ -40,7 +42,7 @@ jobs:
     - name: Run tests
       run: dotnet test Rhombus.WinFormsMcp.sln --configuration Release --no-build --logger "console;verbosity=minimal"
 
-    # Publish to NuGet
+    # Publish to NuGet using Trusted Publishing
     - name: Create NuGet output directory
       run: mkdir -p nupkg
       shell: pwsh
@@ -49,10 +51,14 @@ jobs:
       run: Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/Rhombus.WinFormsMcp.1.0.0.nupkg" -Destination "nupkg/" -Force
       shell: pwsh
 
-    - name: Publish to NuGet (Trusted Publishing)
-      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
-      env:
-        NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TRUSTED_PUBLISHING_TOKEN }}
+    - name: NuGet login (OIDC → temp API key)
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: rhom6us
+
+    - name: Publish to NuGet
+      run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
     # Build NPM package distribution
     - name: Create NPM distribution
