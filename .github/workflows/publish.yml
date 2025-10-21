@@ -48,7 +48,14 @@ jobs:
       shell: pwsh
 
     - name: Copy NuGet package
-      run: Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/Rhombus.WinFormsMcp.1.0.0.nupkg" -Destination "nupkg/Rhombus.WinFormsMcp.1.0.0.nupkg" -Force
+      run: |
+        $nupkg = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release" -Filter "Rhombus.WinFormsMcp.*.nupkg" | Select-Object -First 1
+        if ($nupkg) {
+          Copy-Item -Path $nupkg.FullName -Destination "nupkg/" -Force
+          Write-Host "Copied $($nupkg.Name) to nupkg/"
+        } else {
+          throw "No .nupkg file found matching pattern Rhombus.WinFormsMcp.*.nupkg"
+        }
       shell: pwsh
 
     - name: NuGet login (OIDC → temp API key)
@@ -65,9 +72,17 @@ jobs:
       run: |
         mkdir -p npm/bin
         mkdir -p npm/dist
-        # Copy the compiled server to npm/dist
-        Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows/Rhombus.WinFormsMcp.Server.exe" -Destination "npm/dist/"
-        Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows/*.dll" -Destination "npm/dist/"
+        # Copy the compiled server exe and dlls to npm/dist
+        $exeFile = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "Rhombus.WinFormsMcp.Server.exe" | Select-Object -First 1
+        $dllFiles = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "*.dll"
+        if ($exeFile) {
+          Copy-Item -Path $exeFile.FullName -Destination "npm/dist/" -Force
+          Write-Host "Copied $($exeFile.Name) to npm/dist/"
+        }
+        foreach ($dll in $dllFiles) {
+          Copy-Item -Path $dll.FullName -Destination "npm/dist/" -Force
+          Write-Host "Copied $($dll.Name) to npm/dist/"
+        }
       shell: pwsh
 
     # Publish to NPM
