@@ -1,0 +1,206 @@
+# GitHub Setup Instructions
+
+## Step 1: Create the GitHub Repository
+
+1. Go to [GitHub](https://github.com/new)
+2. Create a new public repository with these settings:
+   - **Repository name:** `winforms-mcp`
+   - **Owner:** `rhom6us`
+   - **Description:** WinForms automation MCP server with headless UI automation
+   - **Public/Private:** Public
+   - **Do NOT initialize with README, .gitignore, or License** (we have these already)
+
+3. Click "Create repository"
+
+## Step 2: Push the Local Repository
+
+After creating the repo on GitHub, run:
+
+```bash
+cd /c/dev/fnWindowsMCP
+git remote add origin https://github.com/rhom6us/winforms-mcp.git
+git branch -M master
+git push -u origin master
+```
+
+If prompted for credentials, use:
+- **Username:** Your GitHub username
+- **Password:** A Personal Access Token (PAT) from https://github.com/settings/tokens
+  - Requires `repo` scope (full control of private repositories)
+
+## Step 3: Add GitHub Secrets for Publishing
+
+Go to **Repository Settings → Secrets and variables → Actions** and add these secrets:
+
+### Required Secrets
+
+1. **NUGET_API_KEY**
+   - Obtain from: https://www.nuget.org/account/ApiKeys
+   - Create API Key with scope: "Push new packages and package versions"
+   - Secret value: The full API key
+
+2. **NPM_TOKEN**
+   - Obtain from: https://www.npmjs.com/settings/rhom6us/tokens
+   - Create automation token (read and write)
+   - Must have publish permissions for `@rhom6us` scope
+   - Secret value: The full token with `npm_` prefix
+
+3. **DOCKER_USERNAME**
+   - Your Docker Hub username
+   - Create account: https://hub.docker.com
+
+4. **DOCKER_PASSWORD**
+   - Docker Hub access token (NOT your password)
+   - Create at: https://hub.docker.com/settings/security
+   - Click "New Access Token"
+   - Grant read, write, delete permissions
+
+## Step 4: Configure Branch Protection (Optional but Recommended)
+
+Go to **Repository Settings → Branches** and create a rule for `master`:
+
+1. Click "Add rule"
+2. Branch name pattern: `master`
+3. Configure protection:
+   - ✅ **Require a pull request before merging**
+     - Require approvals: 1
+     - Require review from code owners
+   - ✅ **Require status checks to pass before merging**
+     - Require branches to be up to date before merging
+     - Select the "build-and-test" status check
+   - ✅ **Restrict who can push to matching branches**
+     - Include administrators
+4. Click "Create"
+
+## Step 5: Trigger the Initial Workflow
+
+Create and push the first tag to trigger the publish workflow:
+
+```bash
+cd /c/dev/fnWindowsMCP
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This will:
+- Run the CI workflow (build and test)
+- Run the publish workflow which will:
+  - Publish to NuGet.org as `Rhombus.WinFormsMcp`
+  - Publish to NPM as `@rhom6us/winforms-mcp`
+  - Build and push Docker image as `rhom6us/winforms-mcp:1.0.0`
+  - Create a GitHub Release with release notes
+
+## Workflow Triggers
+
+### CI Workflow (`ci.yml`)
+Triggers on:
+- Any push to `master` or `main` branch
+- Any pull request to `master` or `main` branch
+
+What it does:
+- Builds the solution on Windows
+- Runs 52+ tests
+- Uploads test coverage
+
+### Publish Workflow (`publish.yml`)
+Triggers on:
+- Push to `master` or `main` branch (uses VERSION file)
+- Push of version tags like `v1.0.0`, `v2.0.0`, etc.
+- Manual workflow dispatch
+
+What it does (if secrets are configured):
+- Publishes to NuGet.org
+- Publishes to NPM Registry
+- Builds and pushes Docker image
+- Creates GitHub Release with binaries
+
+## Publishing a New Version
+
+### Minor Update (Patch Release)
+
+1. Update `VERSION` file:
+   ```
+   1.0.1
+   ```
+
+2. Update `CHANGELOG.md` with changes
+
+3. Commit and push:
+   ```bash
+   git add VERSION CHANGELOG.md
+   git commit -m "chore: bump version to 1.0.1"
+   git push origin master
+   ```
+
+4. The publish workflow will automatically publish to all platforms
+
+### Major or Minor Release
+
+Use tags for semantic versioning:
+
+```bash
+# Update version
+echo "1.1.0" > VERSION
+
+# Update CHANGELOG.md
+git add VERSION CHANGELOG.md
+git commit -m "chore: release version 1.1.0"
+
+# Create and push tag
+git tag v1.1.0
+git push origin master
+git push origin v1.1.0
+
+# Publish workflow triggers automatically
+```
+
+## Package Installation
+
+### NuGet
+```
+Install-Package Rhombus.WinFormsMcp -Version 1.0.0
+```
+
+### NPM
+```bash
+npm install @rhom6us/winforms-mcp@1.0.0
+npx @rhom6us/winforms-mcp
+```
+
+### Docker
+```bash
+docker pull rhom6us/winforms-mcp:1.0.0
+docker run rhom6us/winforms-mcp:1.0.0
+```
+
+### Direct Download
+Download from: https://github.com/rhom6us/winforms-mcp/releases
+
+## Troubleshooting
+
+### Workflow Fails with "Repository not found"
+- Check that the repository URL is correct
+- Ensure GitHub secrets are properly configured
+- Check that the branch name is `master` (not `main`)
+
+### NuGet Publish Fails
+- Verify NUGET_API_KEY is set correctly (should start with `oy2`)
+- Check that package doesn't already exist
+- Ensure version number follows semantic versioning
+
+### NPM Publish Fails
+- Verify NPM_TOKEN is set (should start with `npm_`)
+- Ensure `@rhom6us` scope exists on npmjs.com
+- Check that you have publish permissions
+
+### Docker Build Fails
+- Docker build runs on Windows runner (required for Windows Server Core image)
+- Ensure DOCKER_USERNAME and DOCKER_PASSWORD are set
+- Check Docker Hub has `rhom6us` organization/user
+
+## Reference
+
+- Repository: https://github.com/rhom6us/winforms-mcp
+- NuGet Package: https://www.nuget.org/packages/Rhombus.WinFormsMcp
+- NPM Package: https://www.npmjs.com/package/@rhom6us/winforms-mcp
+- Docker Image: https://hub.docker.com/r/rhom6us/winforms-mcp
