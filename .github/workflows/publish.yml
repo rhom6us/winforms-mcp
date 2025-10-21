@@ -41,14 +41,18 @@ jobs:
       run: dotnet test Rhombus.WinFormsMcp.sln --configuration Release --no-build --logger "console;verbosity=minimal"
 
     # Publish to NuGet
-    - name: Pack NuGet
-      run: dotnet pack src/Rhombus.WinFormsMcp.Server/Rhombus.WinFormsMcp.Server.csproj --configuration Release --output ./nupkg --version-suffix ""
+    - name: Create NuGet output directory
+      run: mkdir -p nupkg
+      shell: pwsh
+
+    - name: Copy NuGet package
+      run: Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/Rhombus.WinFormsMcp.1.0.0.nupkg" -Destination "nupkg/" -Force
+      shell: pwsh
 
     - name: Publish to NuGet (Trusted Publishing)
       run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
       env:
         NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TRUSTED_PUBLISHING_TOKEN }}
-      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     # Build NPM package distribution
     - name: Create NPM distribution
