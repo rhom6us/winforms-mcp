@@ -28,34 +28,46 @@ If prompted for credentials, use:
 - **Password:** A Personal Access Token (PAT) from https://github.com/settings/tokens
   - Requires `repo` scope (full control of private repositories)
 
-## Step 3: Add GitHub Secrets for Publishing
+## Step 3: Configure NuGet Trusted Publishing
+
+NuGet uses trusted publishing with GitHub OIDC tokens instead of long-lived API keys (more secure!).
+
+1. Go to https://www.nuget.org/account/Trusted
+2. Click "Add new policy"
+3. Enter the following trusted policy details:
+   - **Repository Owner:** `rhom6us`
+   - **Repository:** `winforms-mcp`
+   - **Workflow File:** `publish.yml`
+   - **Environment:** (leave empty - not using GitHub environments)
+4. Click "Create"
+
+The policy will then be temporarily active for 7 days. This is normal for new policies.
+
+## Step 4: Add GitHub Secrets for Publishing
 
 Go to **Repository Settings → Secrets and variables → Actions** and add these secrets:
 
 ### Required Secrets
 
-1. **NUGET_API_KEY**
-   - Obtain from: https://www.nuget.org/account/ApiKeys
-   - Create API Key with scope: "Push new packages and package versions"
-   - Secret value: The full API key
-
-2. **NPM_TOKEN**
+1. **NPM_TOKEN**
    - Obtain from: https://www.npmjs.com/settings/rhom6us/tokens
    - Create automation token (read and write)
    - Must have publish permissions for `@rhom6us` scope
    - Secret value: The full token with `npm_` prefix
 
-3. **DOCKER_USERNAME**
+2. **DOCKER_USERNAME**
    - Your Docker Hub username
    - Create account: https://hub.docker.com
 
-4. **DOCKER_PASSWORD**
+3. **DOCKER_PASSWORD**
    - Docker Hub access token (NOT your password)
    - Create at: https://hub.docker.com/settings/security
    - Click "New Access Token"
    - Grant read, write, delete permissions
 
-## Step 4: Configure Branch Protection (Optional but Recommended)
+**NOTE:** NuGet API key is NOT needed! The workflow uses GitHub OIDC tokens for secure, keyless publishing.
+
+## Step 5: Configure Branch Protection (Optional but Recommended)
 
 Go to **Repository Settings → Branches** and create a rule for `master`:
 
@@ -67,12 +79,12 @@ Go to **Repository Settings → Branches** and create a rule for `master`:
      - Require review from code owners
    - ✅ **Require status checks to pass before merging**
      - Require branches to be up to date before merging
-     - Select the "build-and-test" status check
+     - Select the "CI" status check
    - ✅ **Restrict who can push to matching branches**
      - Include administrators
 4. Click "Create"
 
-## Step 5: Trigger the Initial Workflow
+## Step 6: Trigger the Initial Workflow
 
 Create and push the first tag to trigger the publish workflow:
 
@@ -85,7 +97,7 @@ git push origin v1.0.0
 This will:
 - Run the CI workflow (build and test)
 - Run the publish workflow which will:
-  - Publish to NuGet.org as `Rhombus.WinFormsMcp`
+  - Publish to NuGet.org as `Rhombus.WinFormsMcp` (using OIDC trusted publishing)
   - Publish to NPM as `@rhom6us/winforms-mcp`
   - Build and push Docker image as `rhom6us/winforms-mcp:1.0.0`
   - Create a GitHub Release with release notes
@@ -99,7 +111,7 @@ Triggers on:
 
 What it does:
 - Builds the solution on Windows
-- Runs 52+ tests
+- Runs 75+ tests
 - Uploads test coverage
 
 ### Publish Workflow (`publish.yml`)
@@ -109,7 +121,7 @@ Triggers on:
 - Manual workflow dispatch
 
 What it does (if secrets are configured):
-- Publishes to NuGet.org
+- Publishes to NuGet.org (using OIDC tokens)
 - Publishes to NPM Registry
 - Builds and pushes Docker image
 - Creates GitHub Release with binaries
@@ -178,15 +190,18 @@ Download from: https://github.com/rhom6us/winforms-mcp/releases
 
 ## Troubleshooting
 
+### Workflow Fails with "No matching trust policy found"
+- Ensure you've created a NuGet trusted publishing policy at https://www.nuget.org/account/Trusted
+- Policy details must match exactly:
+  - Repository Owner: `rhom6us`
+  - Repository: `winforms-mcp`
+  - Workflow File: `publish.yml` (file name only, no path)
+- Wait 7 days for permanent activation, or temporarily active policies work immediately
+
 ### Workflow Fails with "Repository not found"
 - Check that the repository URL is correct
 - Ensure GitHub secrets are properly configured
 - Check that the branch name is `master` (not `main`)
-
-### NuGet Publish Fails
-- Verify NUGET_API_KEY is set correctly (should start with `oy2`)
-- Check that package doesn't already exist
-- Ensure version number follows semantic versioning
 
 ### NPM Publish Fails
 - Verify NPM_TOKEN is set (should start with `npm_`)
@@ -198,9 +213,21 @@ Download from: https://github.com/rhom6us/winforms-mcp/releases
 - Ensure DOCKER_USERNAME and DOCKER_PASSWORD are set
 - Check Docker Hub has `rhom6us` organization/user
 
+## Security Notes
+
+This project uses **NuGet Trusted Publishing** with GitHub OIDC tokens:
+- ✅ No long-lived API keys to manage
+- ✅ Automatic token rotation (1 hour expiry)
+- ✅ Tokens include cryptographic proof of the workflow
+- ✅ Token exchange happens securely with nuget.org
+- ✅ Follows OpenSSF best practices for keyless publishing
+
+This is much more secure than traditional API keys and requires zero secret rotation.
+
 ## Reference
 
 - Repository: https://github.com/rhom6us/winforms-mcp
 - NuGet Package: https://www.nuget.org/packages/Rhombus.WinFormsMcp
 - NPM Package: https://www.npmjs.com/package/@rhom6us/winforms-mcp
 - Docker Image: https://hub.docker.com/r/rhom6us/winforms-mcp
+- NuGet Trusted Publishing: https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing
