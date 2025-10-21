@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
+using FlaUI.Core.AutomationElements;
+using fnWindowsMCP.Server.Automation;
 
 namespace fnWindowsMCP.Server;
 
@@ -32,12 +34,56 @@ class Program
 }
 
 /// <summary>
+/// Session manager for tracking automation contexts and element references
+/// </summary>
+class SessionManager
+{
+    private readonly Dictionary<string, AutomationElement> _elementCache = new();
+    private readonly Dictionary<int, object> _processContext = new();
+    private int _nextElementId = 1;
+    private AutomationHelper? _automation;
+
+    public AutomationHelper GetAutomation()
+    {
+        return _automation ??= new AutomationHelper();
+    }
+
+    public string CacheElement(AutomationElement element)
+    {
+        var id = $"elem_{_nextElementId++}";
+        _elementCache[id] = element;
+        return id;
+    }
+
+    public AutomationElement? GetElement(string elementId)
+    {
+        return _elementCache.TryGetValue(elementId, out var elem) ? elem : null;
+    }
+
+    public void ClearElement(string elementId)
+    {
+        _elementCache.Remove(elementId);
+    }
+
+    public void CacheProcess(int pid, object context)
+    {
+        _processContext[pid] = context;
+    }
+
+    public void Dispose()
+    {
+        _automation?.Dispose();
+    }
+}
+
+/// <summary>
 /// Core MCP server implementation handling JSON-RPC communication
 /// </summary>
 class AutomationServer
 {
     private readonly Dictionary<string, Func<JsonElement, Task<JsonElement>>> _tools;
     private int _nextId = 1;
+    private readonly SessionManager _session = new();
 
     public AutomationServer()
     {
@@ -293,49 +339,344 @@ class AutomationServer
         };
     }
 
-    // Tool implementations - placeholders for now
-    private async Task<JsonElement> FindElement(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+    // Tool implementations
+    private async Task<JsonElement> FindElement(JsonElement args)
+    {
+        try
+        {
+            var automation = _session.GetAutomation();
+            var pid = GetIntArg(args, "pid");
+            var automationId = GetStringArg(args, "automationId");
+            var name = GetStringArg(args, "name");
+            var className = GetStringArg(args, "className");
 
-    private async Task<JsonElement> ClickElement(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            AutomationElement? element = null;
 
-    private async Task<JsonElement> TypeText(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            if (!string.IsNullOrEmpty(automationId))
+            {
+                element = automation.FindByAutomationId(automationId);
+            }
+            else if (!string.IsNullOrEmpty(name))
+            {
+                element = automation.FindByName(name);
+            }
+            else if (!string.IsNullOrEmpty(className))
+            {
+                element = automation.FindByClassName(className);
+            }
 
-    private async Task<JsonElement> SetValue(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            if (element == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Element not found\"}").RootElement;
 
-    private async Task<JsonElement> GetProperty(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var elementId = _session.CacheElement(element);
+            return JsonDocument.Parse($"{{\"success\": true, \"elementId\": \"{elementId}\", \"name\": \"{element.Name ?? ""}\", \"automationId\": \"{element.AutomationId ?? ""}\", \"controlType\": \"{element.ControlType}\"}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
 
-    private async Task<JsonElement> LaunchApp(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+    private async Task<JsonElement> ClickElement(JsonElement args)
+    {
+        try
+        {
+            var elementId = GetStringArg(args, "elementId");
+            var doubleClick = GetBoolArg(args, "doubleClick", false);
 
-    private async Task<JsonElement> AttachToProcess(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var element = _session.GetElement(elementId);
+            if (element == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Element not found in session\"}").RootElement;
 
-    private async Task<JsonElement> CloseApp(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var automation = _session.GetAutomation();
+            automation.Click(element, doubleClick);
 
-    private async Task<JsonElement> TakeScreenshot(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Element clicked\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
 
-    private async Task<JsonElement> ElementExists(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+    private async Task<JsonElement> TypeText(JsonElement args)
+    {
+        try
+        {
+            var elementId = GetStringArg(args, "elementId");
+            var text = GetStringArg(args, "text") ?? "";
+            var clearFirst = GetBoolArg(args, "clearFirst", false);
 
-    private async Task<JsonElement> WaitForElement(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var element = _session.GetElement(elementId);
+            if (element == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Element not found in session\"}").RootElement;
 
-    private async Task<JsonElement> DragDrop(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var automation = _session.GetAutomation();
+            automation.TypeText(element, text, clearFirst);
 
-    private async Task<JsonElement> SendKeys(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Text typed\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
 
-    private async Task<JsonElement> RaiseEvent(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+    private async Task<JsonElement> SetValue(JsonElement args)
+    {
+        try
+        {
+            var elementId = GetStringArg(args, "elementId");
+            var value = GetStringArg(args, "value") ?? "";
 
-    private async Task<JsonElement> ListenForEvent(JsonElement args) =>
-        JsonDocument.Parse("{}").RootElement;
+            var element = _session.GetElement(elementId);
+            if (element == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Element not found in session\"}").RootElement;
+
+            var automation = _session.GetAutomation();
+            automation.SetValue(element, value);
+
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Value set\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> GetProperty(JsonElement args)
+    {
+        try
+        {
+            var elementId = GetStringArg(args, "elementId");
+            var propertyName = GetStringArg(args, "propertyName") ?? "";
+
+            var element = _session.GetElement(elementId);
+            if (element == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Element not found in session\"}").RootElement;
+
+            var automation = _session.GetAutomation();
+            var value = automation.GetProperty(element, propertyName);
+
+            var valueJson = value == null ? "null" : $"\"{EscapeJson(value.ToString())}\"";
+            var json = $"{{\"success\": true, \"propertyName\": \"{propertyName}\", \"value\": {valueJson}}}";
+            return JsonDocument.Parse(json).RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> LaunchApp(JsonElement args)
+    {
+        try
+        {
+            var path = GetStringArg(args, "path") ?? throw new ArgumentException("path is required");
+            var arguments = GetStringArg(args, "arguments");
+            var workingDirectory = GetStringArg(args, "workingDirectory");
+
+            var automation = _session.GetAutomation();
+            var process = automation.LaunchApp(path, arguments, workingDirectory);
+
+            _session.CacheProcess(process.Id, process);
+
+            return JsonDocument.Parse($"{{\"success\": true, \"pid\": {process.Id}, \"processName\": \"{process.ProcessName}\"}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> AttachToProcess(JsonElement args)
+    {
+        try
+        {
+            var pid = GetIntArg(args, "pid");
+            var processName = GetStringArg(args, "processName");
+
+            var automation = _session.GetAutomation();
+            var process = !string.IsNullOrEmpty(processName)
+                ? automation.AttachToProcessByName(processName)
+                : automation.AttachToProcess(pid);
+
+            _session.CacheProcess(process.Id, process);
+
+            return JsonDocument.Parse($"{{\"success\": true, \"pid\": {process.Id}, \"processName\": \"{process.ProcessName}\"}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> CloseApp(JsonElement args)
+    {
+        try
+        {
+            var pid = GetIntArg(args, "pid");
+            var force = GetBoolArg(args, "force", false);
+
+            var automation = _session.GetAutomation();
+            automation.CloseApp(pid, force);
+
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Application closed\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> TakeScreenshot(JsonElement args)
+    {
+        try
+        {
+            var outputPath = GetStringArg(args, "outputPath") ?? throw new ArgumentException("outputPath is required");
+            var elementId = GetStringArg(args, "elementId");
+
+            var automation = _session.GetAutomation();
+            AutomationElement? element = null;
+
+            if (!string.IsNullOrEmpty(elementId))
+                element = _session.GetElement(elementId);
+
+            automation.TakeScreenshot(outputPath, element);
+
+            return JsonDocument.Parse($"{{\"success\": true, \"message\": \"Screenshot saved to {EscapeJson(outputPath)}\"}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> ElementExists(JsonElement args)
+    {
+        try
+        {
+            var automationId = GetStringArg(args, "automationId") ?? throw new ArgumentException("automationId is required");
+
+            var automation = _session.GetAutomation();
+            var exists = automation.ElementExists(automationId);
+
+            return JsonDocument.Parse($"{{\"success\": true, \"exists\": {(exists ? "true" : "false")}}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> WaitForElement(JsonElement args)
+    {
+        try
+        {
+            var automationId = GetStringArg(args, "automationId") ?? throw new ArgumentException("automationId is required");
+            var timeoutMs = GetIntArg(args, "timeoutMs", 10000);
+
+            var automation = _session.GetAutomation();
+            var found = await automation.WaitForElementAsync(automationId, null, timeoutMs);
+
+            return JsonDocument.Parse($"{{\"success\": true, \"found\": {(found ? "true" : "false")}}}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> DragDrop(JsonElement args)
+    {
+        try
+        {
+            var sourceElementId = GetStringArg(args, "sourceElementId") ?? throw new ArgumentException("sourceElementId is required");
+            var targetElementId = GetStringArg(args, "targetElementId") ?? throw new ArgumentException("targetElementId is required");
+
+            var sourceElement = _session.GetElement(sourceElementId);
+            var targetElement = _session.GetElement(targetElementId);
+
+            if (sourceElement == null || targetElement == null)
+                return JsonDocument.Parse("{\"success\": false, \"error\": \"Source or target element not found in session\"}").RootElement;
+
+            var automation = _session.GetAutomation();
+            automation.DragDrop(sourceElement, targetElement);
+
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Drag and drop completed\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> SendKeys(JsonElement args)
+    {
+        try
+        {
+            var keys = GetStringArg(args, "keys") ?? throw new ArgumentException("keys is required");
+
+            var automation = _session.GetAutomation();
+            automation.SendKeys(keys);
+
+            return JsonDocument.Parse("{\"success\": true, \"message\": \"Keys sent\"}").RootElement;
+        }
+        catch (Exception ex)
+        {
+            return JsonDocument.Parse($"{{\"success\": false, \"error\": \"{EscapeJson(ex.Message)}\"}}").RootElement;
+        }
+    }
+
+    private async Task<JsonElement> RaiseEvent(JsonElement args)
+    {
+        // Event raising is handled by FlaUI patterns in future enhancement
+        return JsonDocument.Parse("{\"success\": false, \"error\": \"Event raising not yet implemented\"}").RootElement;
+    }
+
+    private async Task<JsonElement> ListenForEvent(JsonElement args)
+    {
+        // Event listening is handled by FlaUI event handlers in future enhancement
+        return JsonDocument.Parse("{\"success\": false, \"error\": \"Event listening not yet implemented\"}").RootElement;
+    }
+
+    // Helper methods
+    private string? GetStringArg(JsonElement args, string key)
+    {
+        if (args.ValueKind == JsonValueKind.Null)
+            return null;
+
+        return args.TryGetProperty(key, out var prop) && prop.ValueKind != JsonValueKind.Null
+            ? prop.GetString()
+            : null;
+    }
+
+    private int GetIntArg(JsonElement args, string key, int defaultValue = 0)
+    {
+        if (args.ValueKind == JsonValueKind.Null)
+            return defaultValue;
+
+        return args.TryGetProperty(key, out var prop) && prop.ValueKind == JsonValueKind.Number
+            ? prop.GetInt32()
+            : defaultValue;
+    }
+
+    private bool GetBoolArg(JsonElement args, string key, bool defaultValue = false)
+    {
+        if (args.ValueKind == JsonValueKind.Null)
+            return defaultValue;
+
+        return args.TryGetProperty(key, out var prop) && prop.ValueKind == JsonValueKind.True
+            ? true
+            : args.TryGetProperty(key, out var prop2) && prop2.ValueKind == JsonValueKind.False
+                ? false
+                : defaultValue;
+    }
+
+    private string EscapeJson(string? value)
+    {
+        if (value == null)
+            return "";
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
+    }
 }
