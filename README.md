@@ -178,6 +178,31 @@ Comprehensive NUnit tests covering:
 
 ## Usage
 
+### Quick Start with Claude Code
+
+To use this MCP server with Claude Code, see the complete setup guide: **[Claude Code MCP Setup Guide](docs/CLAUDE_CODE_SETUP.md)**
+
+Quick configuration for `~/.claude/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "winforms-mcp": {
+      "command": "dotnet",
+      "args": ["path/to/Rhombus.WinFormsMcp.Server.dll"],
+      "env": {}
+    }
+  }
+}
+```
+
+Then use in Claude Code:
+```claude
+@mcp winforms-mcp launch_app {
+  "path": "C:\\path\\to\\app.exe"
+}
+```
+
 ### Installation
 
 ```bash
