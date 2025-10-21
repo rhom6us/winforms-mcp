@@ -48,7 +48,7 @@ jobs:
       shell: pwsh
 
     - name: Copy NuGet package
-      run: Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/Rhombus.WinFormsMcp.1.0.0.nupkg" -Destination "nupkg/" -Force
+      run: Copy-Item -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/Rhombus.WinFormsMcp.1.0.0.nupkg" -Destination "nupkg/Rhombus.WinFormsMcp.1.0.0.nupkg" -Force
       shell: pwsh
 
     - name: NuGet login (OIDC → temp API key)
