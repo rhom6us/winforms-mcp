@@ -42,90 +42,7 @@ jobs:
     - name: Run tests
       run: dotnet test Rhombus.WinFormsMcp.sln --configuration Release --no-build --logger "console;verbosity=minimal"
 
-    # Publish to NuGet using Trusted Publishing
-    - name: Create NuGet output directory
-      run: mkdir -p nupkg
-      shell: pwsh
-
-    - name: Copy NuGet package
-      run: |
-        $nupkg = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release" -Filter "Rhombus.WinFormsMcp.*.nupkg" | Select-Object -First 1
-        if ($nupkg) {
-          Copy-Item -Path $nupkg.FullName -Destination "nupkg/" -Force
-          Write-Host "Copied $($nupkg.Name) to nupkg/"
-        } else {
-          throw "No .nupkg file found matching pattern Rhombus.WinFormsMcp.*.nupkg"
-        }
-      shell: pwsh
-
-    - name: NuGet login (OIDC → temp API key)
-      uses: NuGet/login@v1
-      id: nuget-login
-      with:
-        user: butler.software
-
-    - name: Publish to NuGet
-      run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-
-    # Build NPM package distribution
-    - name: Create NPM distribution
-      run: |
-        mkdir -p npm/bin
-        mkdir -p npm/dist
-        # Copy the compiled server exe and dlls to npm/dist
-        $exeFile = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "Rhombus.WinFormsMcp.Server.exe" | Select-Object -First 1
-        $dllFiles = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "*.dll"
-        if ($exeFile) {
-          Copy-Item -Path $exeFile.FullName -Destination "npm/dist/" -Force
-          Write-Host "Copied $($exeFile.Name) to npm/dist/"
-        }
-        foreach ($dll in $dllFiles) {
-          Copy-Item -Path $dll.FullName -Destination "npm/dist/" -Force
-          Write-Host "Copied $($dll.Name) to npm/dist/"
-        }
-      shell: pwsh
-
-    # Publish to NPM
-    - name: Publish to NPM
-      run: |
-        npm config set @rhom6us:registry https://registry.npmjs.org/
-        npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}
-        cd npm
-        npm publish --access public
-      if: env.NPM_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-    # Build and push Docker image
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: ${{ env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '' }}
-        tags: |
-          rhom6us/winforms-mcp:latest
-          rhom6us/winforms-mcp:${{ steps.version.outputs.VERSION }}
-        cache-from: type=registry,ref=rhom6us/winforms-mcp:buildcache
-        cache-to: type=registry,ref=rhom6us/winforms-mcp:buildcache,mode=max
-      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
-    # Create GitHub Release
+    # Step 1: Create GitHub Release
     - name: Create Release
       uses: actions/create-release@v1
       env:
@@ -161,3 +78,85 @@ jobs:
         draft: false
         prerelease: false
       if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
+    # Step 2: Build and push Docker image
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '' }}
+        tags: |
+          rhom6us/winforms-mcp:latest
+          rhom6us/winforms-mcp:${{ steps.version.outputs.VERSION }}
+        cache-from: type=registry,ref=rhom6us/winforms-mcp:buildcache
+        cache-to: type=registry,ref=rhom6us/winforms-mcp:buildcache,mode=max
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Step 3: Publish to NPM
+    - name: Create NPM distribution
+      run: |
+        mkdir -p npm/bin
+        mkdir -p npm/dist
+        # Copy the compiled server exe and dlls to npm/dist
+        $exeFile = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "Rhombus.WinFormsMcp.Server.exe" | Select-Object -First 1
+        $dllFiles = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release/net8.0-windows" -Filter "*.dll"
+        if ($exeFile) {
+          Copy-Item -Path $exeFile.FullName -Destination "npm/dist/" -Force
+          Write-Host "Copied $($exeFile.Name) to npm/dist/"
+        }
+        foreach ($dll in $dllFiles) {
+          Copy-Item -Path $dll.FullName -Destination "npm/dist/" -Force
+          Write-Host "Copied $($dll.Name) to npm/dist/"
+        }
+      shell: pwsh
+
+    - name: Publish to NPM
+      run: |
+        npm config set @rhom6us:registry https://registry.npmjs.org/
+        npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}
+        cd npm
+        npm publish --access public
+      if: env.NPM_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      env:
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    # Step 4: Publish to NuGet using Trusted Publishing
+    - name: Create NuGet output directory
+      run: mkdir -p nupkg
+      shell: pwsh
+
+    - name: Copy NuGet package
+      run: |
+        $nupkg = Get-ChildItem -Path "src/Rhombus.WinFormsMcp.Server/bin/Release" -Filter "Rhombus.WinFormsMcp.*.nupkg" | Select-Object -First 1
+        if ($nupkg) {
+          Copy-Item -Path $nupkg.FullName -Destination "nupkg/" -Force
+          Write-Host "Copied $($nupkg.Name) to nupkg/"
+        } else {
+          throw "No .nupkg file found matching pattern Rhombus.WinFormsMcp.*.nupkg"
+        }
+      shell: pwsh
+
+    - name: NuGet login (OIDC → temp API key)
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: butler.software
+
+    - name: Publish to NuGet
+      run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
