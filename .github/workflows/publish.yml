@@ -44,9 +44,10 @@ jobs:
     - name: Pack NuGet
       run: dotnet pack src/Rhombus.WinFormsMcp.Server/Rhombus.WinFormsMcp.Server.csproj --configuration Release --output ./nupkg --version-suffix ""
 
-    - name: Publish to NuGet
-      run: dotnet nuget push "./nupkg/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-      if: secrets.NUGET_API_KEY != ''
+    - name: Publish to NuGet (Trusted Publishing)
+      run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      env:
+        NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TRUSTED_PUBLISHING_TOKEN }}
 
     # Build NPM package distribution
     - name: Create NPM distribution
