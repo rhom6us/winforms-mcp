@@ -48,6 +48,7 @@ jobs:
       run: dotnet nuget push "./nupkg/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
       env:
         NUGET_AUTH_TOKEN: ${{ secrets.NUGET_TRUSTED_PUBLISHING_TOKEN }}
+      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     # Build NPM package distribution
     - name: Create NPM distribution
@@ -66,7 +67,9 @@ jobs:
         npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}
         cd npm
         npm publish --access public
-      if: secrets.NPM_TOKEN != ''
+      if: env.NPM_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      env:
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     # Build and push Docker image
     - name: Set up Docker Buildx
@@ -77,19 +80,25 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-      if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+        push: ${{ env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '' }}
         tags: |
           rhom6us/winforms-mcp:latest
           rhom6us/winforms-mcp:${{ steps.version.outputs.VERSION }}
         cache-from: type=registry,ref=rhom6us/winforms-mcp:buildcache
         cache-to: type=registry,ref=rhom6us/winforms-mcp:buildcache,mode=max
-      if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     # Create GitHub Release
     - name: Create Release
