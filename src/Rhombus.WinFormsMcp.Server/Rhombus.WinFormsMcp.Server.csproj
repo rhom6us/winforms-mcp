@@ -11,8 +11,8 @@
     <!-- NuGet Package Configuration -->
     <PackageId>Rhombus.WinFormsMcp</PackageId>
     <Version>1.0.0</Version>
-    <Authors>rhom6us</Authors>
-    <Company>rhom6us</Company>
+    <Authors>butler.software</Authors>
+    <Company>butler.software</Company>
     <Product>Rhombus.WinFormsMcp</Product>
     <Description>WinForms automation MCP server using FlaUI with UIA2 backend for headless Windows Forms application testing and automation</Description>
     <PackageProjectUrl>https://github.com/rhom6us/winforms-mcp</PackageProjectUrl>
